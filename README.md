@@ -1,33 +1,54 @@
-# EyeTracker
-A lightweight, robust Python eye tracker
+The issue is that Raspberry Pi cameras use different backends than regular USB webcams. The cv2.CAP_DSHOW backend I used is Windows-specific and won't work on Raspberry Pi.
+Here are the steps to troubleshoot and fix your Raspberry Pi camera:
+1. Enable the Camera Interface
+bashsudo raspi-config
 
-This repository is an open-source eye tracking algorithm written in Python. Currently, it is an updated version of the pupil tracker from https://github.com/YutaItoh/3D-Eye-Tracker/blob/master/main/pupilFitter.h that has been optimized and simplified. 
+Go to Interface Options → Camera → Enable
+Reboot: sudo reboot
 
-To use the script, run "python .\OrloskyPupilDetector.py" from your shell. If the hardcoded file path in the select_video() function does not find a video at the specified path, it will open a browse window that allows you to select a video. The process_video() function handles the majority of the processing and can be easily modified to work with a camera capture or image. It returns a rotated_rect that represents the pupil ellipse. A lite version is also included that is more efficient, but less robust. Be sure to have an adequate light source for the lite version. 
+2. Check Camera Detection
+bash# For older Raspberry Pi OS
+vcgencmd get_camera
 
-A test video (eye_test.mp4) is included in the root directory for testing. Algorithm details are explained here: https://www.youtube.com/watch?v=bL92JUBG8xw
+# For newer Raspberry Pi OS (with libcamera)
+libcamera-hello --list-cameras
+3. Check Camera Connection
 
-When running the script on this test video, your results should look like this: https://youtu.be/B06cUMplDHw.  
+Ensure the ribbon cable is properly connected
+The blue side should face the USB ports on the Pi
 
-If you need an eye camera with custome LEDs, I have instructions for building your own IR camera for under $100 here: https://www.youtube.com/watch?v=8lZqCMRMtC8
-Alternatively, there is a small $17 IR camera that works well with some modification: https://amzn.to/41x8p2W
+4. Install Required Packages (if needed)
+bash# For older systems
+sudo apt update
+sudo apt install python3-opencv
 
-To help support this software and other open-source projects, please consider subscribing to my YouTube channel: https://www.youtube.com/@jeoresearch
+# For newer systems with libcamera
+sudo apt install python3-picamera2
+5. Alternative: Use PiCamera Library
+If OpenCV still doesn't work, here's a version using the PiCamera library:
+python# Install with: pip install picamera2
+from picamera2 import Picamera2
+import cv2
+import numpy as np
 
-Other useful tools/supplies 
-- Spinel Camera (~$100): https://amzn.to/3D8faQB (price may vary)
-- LEDs for Spinel ($8): https://amzn.to/41rEwAS
-- USB Extension cable x2 ($8): https://amzn.to/4knyf1N (for extending GC0308 cable)
-
-Affiliate links on this page help support the channel at no extra cost to you. As an Amazon Associate, I earn from qualifying purchases. All earnings support the development of open-source software and projects like this! 
-
-Requirements:
-- A Python environment
-
-Packages
-- numpy ****There is a known issue with numpy 2.0.0. Downgrading to 1.26.0 or another version can solve this issue.
-- opencv
-
-Assumptions
-- Works best with 640x480 videos. Images will be cropped to size equally horizontally/vertically if aspect ratio is not 4:3.
-- The image must be that of the entire eye. Dark regions in the corners of the image (e.g. VR display lens borders) should be cropped. 
+def start_picamera_tracking():
+    picam2 = Picamera2()
+    config = picam2.create_preview_configuration(main={"size": (640, 480)})
+    picam2.configure(config)
+    picam2.start()
+    
+    while True:
+        frame = picam2.capture_array()
+        # Convert from RGB to BGR for OpenCV
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        
+        # Your existing eye tracking code here...
+        # process_frame(frame)
+        
+        cv2.imshow('Raspberry Pi Camera', frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    
+    picam2.stop()
+    cv2.destroyAllWindows()
+The updated code I provided will try multiple backends (V4L2, GStreamer) that work better with Raspberry Pi cameras. Try running it and let me know what error messages you get - this will help pinpoint the exact issue!
